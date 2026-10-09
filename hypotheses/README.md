@@ -14,4 +14,5 @@ Metrics:
 Decision:
 ```
 
-Primary candidate: `H01-attention-eam-residual.md`.
+Primary: `H01-attention-eam-residual.md`  
+Backups: `H02-elasticity-enthalpy-pareto.md`, `H03-softening-modes.md`

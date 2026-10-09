@@ -1,105 +1,134 @@
 # Research directions for the diploma
 
-Ranked tracks. Primary track first. Each track is sized for ~60 pages with theory, related work, method, Al–Ni experiments, ablations and failure analysis.
+Primary track first. Each track is sized for about 60 pages. Rose residual fitting remains a negative control only.
 
-## Field snapshot
+Deepened after a dedicated research pass ([MLIP diploma novelty research](e9deecbe-cef9-4b5f-8c8c-8ee14cc0c715)). Paper years and numeric constants in that pass must be checked against primaries before the thesis text freezes.
 
-Universal MLIPs are pretrained and ranked on crystal-stability discovery benchmarks. Specialist equivariant models dominate force accuracy when DFT data exist. Documented failure modes: PES softening, MD-breaking non-smoothness, short-range repulsion holes, and a Pareto tension between formation energies and elastic moduli. Attention already exists in TorchMD-Net-class models. Hybrid EAM+NN exists for Sn under pressure. The open niche for Al–Ni is a **specialist hybrid with attention residual**, trained on DFT forces and virials, evaluated on thermodynamics **and** elasticity **and** softening probes, against Mishin and a pure MLIP of matched budget.
+## Field snapshot 2024–2026
+
+Foundation MLIPs train on Materials Project, Alexandria, OMat24 and MPtrj families. Models in active use include MACE-MP, CHGNet, M3GNet, SevenNet, MatterSim, Orb, EquiformerV2, GRACE and related checkpoints. Matbench Discovery ranks hull stability, not meV alloy thermodynamics.
+
+Documented blind spots:
+
+- PES softening of forces, phonons and moduli after near-equilibrium pretraining
+- Non-conservative force heads that break long MD
+- Weak transfer of potential uncertainty onto phase boundaries and defect energies
+- Elasticity versus formation-enthalpy tension inside limited functional classes
+- Short-range repulsion holes fixed in practice by ZBL or EAM walls
+
+Attention already exists in TorchMD-Net-class models. Hybrid EAM+NN already exists for Sn under pressure and in PINN-style parameterisation of analytic forms. Novelty must sit in what the hybrid **measures or proves**, not in the word hybrid.
 
 ---
 
-## Track A — primary recommendation
+## Track A — primary
 
-### Attention residual on a frozen EAM backbone for Al–Ni
+### Target-oriented UQ hybrid for γ–γ′ and L1₂ planar defects
 
-**Question.** Can a distance-aware attention residual $\varepsilon_\theta$, added to a classical EAM and trained on DFT $\{E,F,\Xi\}$, improve the joint error in $\Delta H$ and $B$ and reduce softening on defects relative to pure EAM, Mishin, MLP residual, and a pure attention MLIP without EAM?
+**Question.** What energy accuracy is necessary and sufficient to predict the γ–γ′ solvus and APB, SISF, CSF energies in Ni₃Al within a stated tolerance? Can that accuracy be reached with minimal DFT by acquiring configurations that maximise expected reduction of variance of the **target observable**, not of raw energy or force RMSE?
+
+**Scale argument.** If coexistence satisfies $\Delta g(T^*)=0$, then
+
+$$
+\delta T^* \approx \frac{\delta\Delta h}{\Delta s}.
+$$
+
+With $\Delta s\sim 0.5\,k_B$ per atom one obtains roughly $20$ K per $1$ meV/atom. For a (111) planar defect in Ni₃Al, $1$ meV per interface atom is about $3$ mJ/m². Foundation MAE of several meV/atom is therefore not enough for the diploma observables.
 
 **Architecture.**
 
 $$
-U = U_{\mathrm{EAM}} + \sum_i \varepsilon_\theta(\mathcal{N}_i)
+U(\mathbf R)
+=
+U_{\mathrm{EAM}}
++
+\sum_i g(\gamma_i)\,
+\mathbf w^\top \boldsymbol\varphi_\theta(\mathbf h_i).
 $$
 
-- $U_{\mathrm{EAM}}$ frozen Morse–FS or Mishin gauge-fixed baseline
-- $\varepsilon_\theta$: equivariant Transformer block with distance-aware multi-head attention, gated to zero on pure-species environments if desired
-- optional ZBL or hard short-range wall under both terms
-- forces strictly $-\nabla U$
+- $U_{\mathrm{EAM}}$ frozen Mishin or Morse–FS
+- $\mathbf h_i$ from 2–3 layers of distance-aware attention with species-dependent biases and a cutoff placed so that $U$ stays smooth when neighbours enter the sphere
+- Bayesian last layer $\mathbf w\sim\mathcal N(\boldsymbol\mu,\boldsymbol\Sigma)$ after features are trained
+- extrapolation grade $\gamma_i$ with smooth gate $g(\gamma)$ that returns the model to pure EAM out of distribution
+- forces strictly $-\nabla U$, including derivatives through the gate
 
-**What is new.** Not “attention exists”. The claim is the **interaction** of classical metallic inductive bias with attention residual on a binary alloy protocol where elasticity and formation heat are scored together, with hold-out packings and a softening probe. Closest prior art: EAM-R for Sn, TorchMD-Net for molecules, uMLIP fine-tunes without classical backbone.
+**Target-oriented acquisition.** For an observable $Q$ with sensitivity $\mathbf g_Q=\partial Q/\partial\mathbf w$,
 
-**Data.** DFT energies, forces, virials on strained Al, Ni, NiAl cells, random alloy supercells, at least one defect class. Active learning after the first specialist. RTX 5090 is enough for the network. DFT is the bottleneck.
+$$
+\Delta\operatorname{Var}Q(x)
+=
+\frac{(\mathbf g_Q^\top\boldsymbol\Sigma\boldsymbol\psi)^2}{\sigma^2+\boldsymbol\psi^\top\boldsymbol\Sigma\boldsymbol\psi}.
+$$
 
-**Evaluation.** Emergent $a$, $\Delta H$, $B$ versus experiment. Gaps versus Mishin on hold-out packings. Vacancy or barrier versus DFT. Ablations: no residual, MLP residual, attention residual, attention-only MLIP, CHGNet or MACE fine-tune.
+Candidates are chosen to reduce $\operatorname{Var}$ of solvus or defect energy, not only $\max\sigma_F$.
 
-**Failure modes.** Residual fights EAM gauge. Attention introduces force spikes. Softening remains if high-energy DFT is missing. Experiment looks strong while DFT transfer fails.
+**What is new.** Foundation and specialist MLIPs optimise $E$/$F$ RMSE. Uncertainty-driven AL usually maximises force variance or D-optimality. Transfer of calibrated parameter uncertainty onto a metallic phase boundary and planar-defect energies, with an OOD gate back to EAM, is the claim. Closest neighbours: PINN for BOP parameters, FLARE/DP-GEN-style AL, EAM-R hybrids without target-oriented UQ.
 
-**Why ~60 pages.** Symmetry and conservation theory, EAM review, attention residual derivation, DFT dataset construction, full ablation tables, MD stability, honest negative controls including the Rose hybrid.
+**Protocol without DFT first.** Run the full AL loop against a frozen teacher MLIP. Compare target-oriented acquisition, max-$\gamma$ acquisition and random sampling on the curve “oracle calls versus $\operatorname{Var}Q$”. Replace the teacher by spin-polarised PBE DFT later.
 
-**DFT required.** Yes.
+**Evaluation versus experiment.** γ–γ′ boundary against CALPHAD and experiment, lattice misfit, planar-defect energy intervals from TEM literature, calibration of $\pm 2\sqrt{\operatorname{Var}Q}$ coverage.
 
----
+**Evaluation versus Mishin.** Same observables plus decomposition into EAM contribution and residual. OOD rollback test: large $\gamma$ must recover EAM.
 
-## Track B — backup
+**Failure modes.** Underconfident Bayesian last layer. Force spikes if the gate is too sharp. Vibrational entropy comparable to configuration error. PBE systematics in Ni-rich $\Delta H$. Magnetic Ni in DFT.
 
-### Softening-aware fine-tune of a foundation model on Al–Ni with curvature loss
+**DFT.** Required for the final claim. About $10^3$–$3\cdot 10^3$ cells up to ~100 atoms is a working estimate. Pipeline debugging needs no DFT.
 
-**Question.** Does adding explicit curvature or barrier targets, plus replay against catastrophic forgetting, fix PES softening on Al–Ni better than vanilla fine-tuning?
-
-**Method.** Start from CHGNet or MACE-MP-class checkpoint. Fine-tune with energy, forces, virial and a finite-difference or phonon/barrier term. Keep a replay buffer of general chemistries or use an EWC-style penalty.
-
-**Novelty.** Softening papers show that a few high-energy points help. A full Al–Ni specialist study with elasticity + defect metrics and forgetting analysis is still thesis-sized and concrete.
-
-**DFT required.** Yes, but fewer points than training from scratch.
-
----
-
-## Track C — backup
-
-### Multi-objective Pareto: formation enthalpy versus elasticity under one potential
-
-**Question.** Where is the Pareto front of $\mathrm{MAE}(\Delta H)$ versus $\mathrm{MAE}(B)$ for EAM, hybrid residual, pure MACE-like specialist and foundation fine-tune on identical Al–Ni data?
-
-**Method.** Fixed dataset. Sweep loss weights $(w_E,w_F,w_\Xi)$. Report fronts, not a single “winner” checkpoint. Optionally gradient-surgery style multi-task optimisation.
-
-**Novelty.** Literature already hints that bulk modulus is harder than formation energy for graph models. A controlled binary-alloy Pareto with classical and neural models is a clear chapter-level contribution and supports Track A.
-
-**DFT required.** Yes for the neural models. Classical EAM can sit on the same plot from existing fits.
+**Pages.** Theory of UQ transfer and acquisition, architecture, teacher AL, DFT AL, observables, calibration, limits.
 
 ---
 
-## Track D — optional stretch
+## Track B — backup 1
 
-### Smoothness-constrained attention for metals
+### Pareto front of elasticity versus formation enthalpy across model classes
 
-**Question.** Do temperature-controlled or otherwise smoothed attention kernels reduce bond-deformation artifacts and NVE drift on Al–Ni relative to vanilla multi-head attention at matched force RMSE?
+**Question.** Is the elasticity–thermochemistry compromise an intrinsic limitation of the EAM functional class in Al–Ni? What residual capacity collapses the front toward a single point?
 
-**Method.** Implement BSCT-like bond scans and force-smoothness deviation as an in-the-loop metric. Compare attention variants inside Track A’s residual.
+**Analytic lever.** For cubic EAM the Cauchy pressure is tied to $F''$. For NiAl experiment gives $C_{12}-C_{44}$ of order $30$ GPa. Formation enthalpies depend on $F_s(\bar\rho_s)$ in mixed environments. That yields a constrained feasible set for simultaneous approximation inside pure EAM.
 
-**Novelty.** Smoothness-guided architecture choice on a metallic alloy, not only on molecular testbeds.
+**Method.** Two loss families: elastic paths and $C_{ij}$; formation and defect energetics. Build Pareto fronts for EAM, pair residual, three-body residual, attention residual, full MLIP. Place foundation checkpoints as points in the same plane. Hypervolume versus capacity is the headline plot.
 
-**DFT required.** Same as Track A.
+**What is new.** Not another scalar fit. An answer to **why** classical models sit where they sit, and how much neural capacity buys on a fixed Al–Ni protocol.
+
+**DFT.** Optional. Experiment plus a teacher MLIP already support the front. A small DFT set strengthens it.
+
+---
+
+## Track C — backup 2
+
+### Modal decomposition of PES softening and Hessian distillation into the hybrid
+
+**Question.** Is softening a scalar factor, or does it depend on mode character, mixed Ni–Al motion and transversality? Can a few reference Hessians plus an EAM anchor correct it?
+
+**Method.** Generalised eigenproblem between teacher and reference dynamical matrices. Distill Hessian-vector products into the hybrid residual. Compare phonon branches and $C_{ij}(T)$ against experiment and Mishin.
+
+**What is new relative to scalar fine-tuning papers and Hessian distillation into generic MLIPs.** Modal structure of the error plus an EAM asymptotic wall.
+
+**DFT.** Small: tens of DFPT or finite-displacement Hessians.
+
+---
+
+## Track D — chapter inside A
+
+### Structural OOD: left-out packings and defects
+
+Train on fcc, bcc, B2, L1₂ distortions. Test on D0₁₁, D5₁₃ and related packings, dislocation cores, γ–γ′ interfaces. Measure hull-distance sign errors and the gain from the OOD gate versus a pure MLIP of matched capacity.
 
 ---
 
 ## Track E — reject as main claim
 
-### Rose-curve residual or direct experimental scalar fitting
-
-Already executed as a negative control. Matches experiment because the teacher encodes experiment. Keep in the thesis as a didactic failure mode.
+Rose EOS residual or experimental $a$, $\Delta H$, $B$ as separate loss terms. Documented in `docs/06-negative-controls.md`.
 
 ---
 
-## Suggested thesis spine if Track A is chosen
+## Optional later extensions
 
-1. Interatomic potentials and alloy observables
-2. Classical EAM for Al–Ni and Mishin reference
-3. Neural and foundation MLIPs, attention, known blind spots
-4. Hybrid attention residual method
-5. DFT dataset and active learning
-6. Results versus experiment, Mishin, pure MLIP, Rose negative control
-7. Softening and smoothness probes
-8. Limits and outlook
+- Latent Ewald versus local cutoff for meV ordering hierarchy in Ni–Al. Likely a null or high-risk study.
+- Conservative EAM+residual plus a measured non-conservative patch, scored on vacancy diffusion and melting coexistence.
+- Multi-fidelity PBE / r2SCAN token after DFT of both levels exists.
 
-## Decision needed from you
+## Recommendation
 
-Reply with `A`, `B`, `C`, or a mix such as `A+C`. Implementation starts after that choice, on the 5090 when available.
+Take **A**, with **D** as a transfer chapter and a short conservative-force chapter. Keep **B** if DFT is late. Keep **C** if the softening literature becomes the supervisor’s preferred frame.
+
+Reply with `A`, `B`, `C`, or `A+B` after feedback.

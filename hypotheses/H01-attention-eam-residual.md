@@ -1,34 +1,32 @@
-# H01 — Attention residual on EAM for Al–Ni
+# H01 — Target-oriented attention residual on EAM
 
 Status: proposed  
 Track: A
 
 ## Claim
 
-A distance-aware attention residual on a frozen EAM backbone, trained on DFT $E$, $F$, $\Xi$ for Al–Ni, improves the joint experimental error in $\Delta H$ and $B$ and reduces softening on at least one defect probe relative to:
+A distance-aware attention residual on a frozen EAM backbone, with a Bayesian last layer and an OOD gate back to EAM, trained by target-oriented active learning on DFT $E$, $F$, $\Xi$, predicts the γ–γ′ solvus and L1₂ planar-defect energies with calibrated uncertainty using fewer DFT labels than force-uncertainty AL, and beats Mishin, pure EAM, MLP residual and attention-only MLIP on the joint diploma protocol.
 
-- pure EAM
-- Mishin 2009
-- MLP residual with the same data
-- attention-only MLIP without EAM
-- foundation fine-tune without classical backbone
-
-## Method
+## Architecture
 
 $$
-U = U_{\mathrm{EAM}} + \sum_i \varepsilon_\theta^{\mathrm{attn}}(\mathcal{N}_i)
+U = U_{\mathrm{EAM}} + \sum_i g(\gamma_i)\,\mathbf w^\top\boldsymbol\varphi_\theta(\mathbf h_i)
 $$
 
-Conservative forces. Optional short-range empirical wall. Ablations mandatory.
+Conservative forces. Smooth cutoff in attention. Gate returns to EAM out of distribution.
 
 ## Data needs
 
-DFT labels on strained cells, mixed supercells, one defect family. Active learning after first specialist. RTX 5090 for training.
+Teacher-MLIP AL loop first. Then spin-polarised PBE on strained cells, mixed supercells, planar-defect cells. RTX 5090 for the network. DFT is the bottleneck.
 
 ## Metrics
 
-Emergent $a$, $\Delta H$, $B$. Hold-out packing gaps. Softening probe versus DFT. NVE drift. Pareto of $\mathrm{MAE}(\Delta H)$ versus $\mathrm{MAE}(B)$.
+- $\operatorname{Var}$ of solvus temperature and APB/SISF/CSF versus number of oracle calls
+- emergent $a$, $\Delta H$, $B$ for Al, Ni, NiAl, Ni₃Al
+- coverage of experiment by $\pm 2\sqrt{\operatorname{Var}Q}$
+- OOD rollback to EAM
+- ablations: no residual, MLP residual, attention residual, no gate, no Bayesian layer
 
 ## Decision
 
-Waiting for supervisor-facing feedback: accept Track A, or switch to B/C.
+Waiting for feedback.
